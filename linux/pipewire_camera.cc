@@ -483,7 +483,7 @@ namespace lite_camera {
 struct PipeWireCamera::Impl {};
 bool PipeWireCamera::ShouldUse() { return false; }
 std::vector<std::string> PipeWireCamera::ListDevices() { return {}; }
-PipeWireCamera::PipeWireCamera() : impl_(nullptr) {}
+PipeWireCamera::PipeWireCamera() = default;
 PipeWireCamera::~PipeWireCamera() = default;
 bool PipeWireCamera::Open(int, uint32_t, uint32_t, RgbaCallback) { return false; }
 void PipeWireCamera::Close() {}

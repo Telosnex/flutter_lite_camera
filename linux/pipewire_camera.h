@@ -45,7 +45,11 @@ class PipeWireCamera {
   struct Impl;
 
  private:
+#ifdef FLC_HAVE_PIPEWIRE
+  // Only the PipeWire build uses it. In the stub, an unused private field
+  // is a -Wunused-private-field error under -Werror.
   Impl *impl_;
+#endif
   uint32_t width_ = 0;
   uint32_t height_ = 0;
 };
