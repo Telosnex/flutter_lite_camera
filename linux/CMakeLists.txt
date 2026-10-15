@@ -16,6 +16,8 @@ list(APPEND PLUGIN_SOURCES
   "flutter_lite_camera_plugin.cc"
   "camera_texture.cc"
   "camera_texture.h"
+  "pipewire_camera.cc"
+  "pipewire_camera.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
@@ -43,6 +45,18 @@ target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter)
 target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::GTK)
+
+# Camera portal + PipeWire, for Flatpak sandboxes (no /dev/video*). Optional:
+# without libpipewire-0.3 the plugin uses V4L2 only.
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PIPEWIRE IMPORTED_TARGET libpipewire-0.3)
+if(PIPEWIRE_FOUND)
+  target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::PIPEWIRE)
+  target_compile_definitions(${PLUGIN_NAME} PRIVATE FLC_HAVE_PIPEWIRE)
+  message(STATUS "flutter_lite_camera: camera portal support (PipeWire ${PIPEWIRE_VERSION})")
+else()
+  message(STATUS "flutter_lite_camera: no libpipewire-0.3, V4L2 only")
+endif()
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an

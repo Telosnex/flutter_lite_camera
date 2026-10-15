@@ -7,6 +7,10 @@
 #include <poll.h>
 
 #include "include/pixel_format.h"
+#include "pipewire_camera.h"
+
+#include <condition_variable>
+#include <chrono>
 
 // Bytes of frame data in a dequeued buffer. Some drivers leave bytesused at
 // 0; then the mapped length is the bound.
@@ -17,8 +21,46 @@ static size_t FrameBytesUsed(const v4l2_buffer &buf, const Buffer &mapped)
 }
 
 
+static lite_camera::PipeWireCamera *Portal(void *p)
+{
+    return static_cast<lite_camera::PipeWireCamera *>(p);
+}
+
+bool Camera::OpenPortal(int cameraIndex)
+{
+    if (!portalCamera)
+        portalCamera = new lite_camera::PipeWireCamera();
+    portalIndex = cameraIndex;
+    if (!Portal(portalCamera)->Open(cameraIndex, frameWidth, frameHeight,
+                                    [this](const unsigned char *rgba, uint32_t w, uint32_t h)
+                                    { OnPortalFrame(rgba, w, h); }))
+    {
+        delete Portal(portalCamera);
+        portalCamera = nullptr;
+        return false;
+    }
+    frameWidth = Portal(portalCamera)->width();
+    frameHeight = Portal(portalCamera)->height();
+    return true;
+}
+
+// PipeWire's thread. The stream runs while the camera is open; the preview
+// callback gets frames only between StartCaptureLoop and StopCaptureLoop.
+void Camera::OnPortalFrame(const unsigned char *rgba, uint32_t width, uint32_t height)
+{
+    std::lock_guard<std::mutex> lock(cacheMutex);
+    if (width != frameWidth || height != frameHeight)
+        return;
+    cachedRgba.assign(rgba, rgba + size_t(width) * height * 4);
+    if (streaming.load() && frameCallback)
+        frameCallback(rgba, (int)width, (int)height);
+}
+
 bool Camera::Open(int cameraIndex)
 {
+    if (lite_camera::PipeWireCamera::ShouldUse())
+        return OpenPortal(cameraIndex);
+
     std::string devicePath = "/dev/video" + std::to_string(cameraIndex);
     fd = open(devicePath.c_str(), O_RDWR);
     if (fd < 0)
@@ -56,6 +98,12 @@ bool Camera::Open(int cameraIndex)
 void Camera::Release()
 {
     StopCaptureLoop();
+    if (portalCamera)
+    {
+        // Close stops PipeWire's thread, so no frame arrives after it.
+        delete Portal(portalCamera);
+        portalCamera = nullptr;
+    }
 
     {
         std::lock_guard<std::mutex> lock(cacheMutex);
@@ -74,6 +122,15 @@ void Camera::Release()
 
 bool Camera::StartCaptureLoop(FrameCallback callback)
 {
+    if (portalCamera)
+    {
+        if (streaming.load())
+            return false;
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        frameCallback = std::move(callback);
+        streaming.store(true);
+        return true;
+    }
     if (fd < 0 || streaming.load())
         return false;
 
@@ -85,6 +142,13 @@ bool Camera::StartCaptureLoop(FrameCallback callback)
 
 void Camera::StopCaptureLoop()
 {
+    if (portalCamera)
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        streaming.store(false);
+        frameCallback = nullptr;
+        return;
+    }
     streaming.store(false);
     if (captureThread.joinable())
     {
@@ -154,6 +218,35 @@ void Camera::CaptureLoop()
 
 bool Camera::SetResolution(int width, int height)
 {
+    if (portalCamera)
+    {
+        // Reopen the stream at the new size; keep the preview callback.
+        const uint32_t oldWidth = frameWidth, oldHeight = frameHeight;
+        FrameCallback callback;
+        {
+            std::lock_guard<std::mutex> lock(cacheMutex);
+            callback = frameCallback;
+        }
+        const bool wasStreaming = streaming.load();
+        delete Portal(portalCamera);
+        portalCamera = nullptr;
+        frameWidth = width;
+        frameHeight = height;
+        bool ok = OpenPortal(portalIndex);
+        if (!ok)
+        {
+            frameWidth = oldWidth;
+            frameHeight = oldHeight;
+            OpenPortal(portalIndex);
+        }
+        {
+            std::lock_guard<std::mutex> lock(cacheMutex);
+            cachedRgba.clear();
+            frameCallback = callback;
+        }
+        streaming.store(wasStreaming && portalCamera != nullptr);
+        return ok;
+    }
     if (fd == -1)
     {
         std::cerr << "Device not opened." << std::endl;
@@ -221,9 +314,23 @@ bool Camera::SetResolution(int width, int height)
 
 FrameData Camera::CaptureFrame()
 {
+    // The portal stream always runs: wait briefly for its first frame.
+    if (portalCamera)
+    {
+        for (int i = 0; i < 100; ++i)
+        {
+            {
+                std::lock_guard<std::mutex> lock(cacheMutex);
+                if (!cachedRgba.empty())
+                    break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+    }
+
     // While the preview stream is running, serve the latest cached frame
     // instead of dequeuing a new buffer.
-    if (streaming.load())
+    if (streaming.load() || portalCamera)
     {
         FrameData frame;
         frame.width = frameWidth;
@@ -401,6 +508,16 @@ void Camera::StopCapture()
 std::vector<MediaTypeInfo> Camera::ListSupportedMediaTypes()
 {
     std::vector<MediaTypeInfo> mediaTypes;
+    if (portalCamera)
+    {
+        // PipeWire negotiates the size; report the current one.
+        MediaTypeInfo info = {};
+        info.width = frameWidth;
+        info.height = frameHeight;
+        strncpy(info.subtypeName, "PipeWire", sizeof(info.subtypeName) - 1);
+        mediaTypes.push_back(info);
+        return mediaTypes;
+    }
 
     if (fd == -1)
     {
@@ -461,6 +578,17 @@ std::vector<MediaTypeInfo> Camera::ListSupportedMediaTypes()
 std::vector<CaptureDeviceInfo> ListCaptureDevices()
 {
     std::vector<CaptureDeviceInfo> devices;
+
+    if (lite_camera::PipeWireCamera::ShouldUse())
+    {
+        for (const std::string &name : lite_camera::PipeWireCamera::ListDevices())
+        {
+            CaptureDeviceInfo deviceInfo = {};
+            strncpy(deviceInfo.friendlyName, name.c_str(), sizeof(deviceInfo.friendlyName) - 1);
+            devices.push_back(deviceInfo);
+        }
+        return devices;
+    }
 
     // Scan for /dev/videoX devices
     for (int i = 0; i < 10; ++i) // Check first 10 devices (can be increased if needed)

@@ -146,6 +146,14 @@ private:
     uint32_t pixelFormat = 0;
     uint32_t bytesPerLine = 0;
 
+    // Camera portal + PipeWire backend (pipewire_camera.h), used in a
+    // Flatpak sandbox instead of /dev/video*. Opaque here so that the
+    // header needs no PipeWire.
+    void *portalCamera = nullptr;
+    int portalIndex = -1;
+    bool OpenPortal(int cameraIndex);
+    void OnPortalFrame(const unsigned char *rgba, uint32_t width, uint32_t height);
+
     bool NegotiateFormat(uint32_t width, uint32_t height);
     bool InitDevice();
     void UninitDevice();
