@@ -141,6 +141,12 @@ private:
     Buffer *buffers;
     unsigned int bufferCount;
 
+    // The format the driver granted (lite_camera::kSupportedFormats) and its
+    // row stride. Set by NegotiateFormat.
+    uint32_t pixelFormat = 0;
+    uint32_t bytesPerLine = 0;
+
+    bool NegotiateFormat(uint32_t width, uint32_t height);
     bool InitDevice();
     void UninitDevice();
     bool StartCapture();

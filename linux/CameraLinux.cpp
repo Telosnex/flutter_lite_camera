@@ -6,58 +6,16 @@
 #include <cstring>
 #include <poll.h>
 
-unsigned char clamp(double value, double min, double max)
+#include "include/pixel_format.h"
+
+// Bytes of frame data in a dequeued buffer. Some drivers leave bytesused at
+// 0; then the mapped length is the bound.
+static size_t FrameBytesUsed(const v4l2_buffer &buf, const Buffer &mapped)
 {
-    if (value < min)
-        return static_cast<unsigned char>(min);
-    if (value > max)
-        return static_cast<unsigned char>(max);
-    return static_cast<unsigned char>(value);
+    const size_t used = buf.bytesused ? buf.bytesused : mapped.length;
+    return used < mapped.length ? used : mapped.length;
 }
 
-void ConvertYUY2ToRGB(const unsigned char *yuy2Data, unsigned char *rgbData, int width, int height)
-{
-    int rgbIndex = 0;
-    for (int i = 0; i < width * height * 2; i += 4)
-    {
-        // Extract YUV values
-        unsigned char y1 = yuy2Data[i];
-        unsigned char u = yuy2Data[i + 1];
-        unsigned char y2 = yuy2Data[i + 2];
-        unsigned char v = yuy2Data[i + 3];
-
-        rgbData[rgbIndex++] = clamp(y1 + 1.402 * (v - 128), 0.0, 255.0);
-        rgbData[rgbIndex++] = clamp(y1 - 0.344136 * (u - 128) - 0.714136 * (v - 128), 0.0, 255.0);
-        rgbData[rgbIndex++] = clamp(y1 + 1.772 * (u - 128), 0.0, 255.0);
-
-        // Convert second pixel (Y2, U, V) to RGB
-        rgbData[rgbIndex++] = clamp(y2 + 1.402 * (v - 128), 0.0, 255.0);
-        rgbData[rgbIndex++] = clamp(y2 - 0.344136 * (u - 128) - 0.714136 * (v - 128), 0.0, 255.0);
-        rgbData[rgbIndex++] = clamp(y2 + 1.772 * (u - 128), 0.0, 255.0);
-    }
-}
-
-void ConvertYUY2ToRGBA(const unsigned char *yuy2Data, unsigned char *rgbaData, int width, int height)
-{
-    int rgbaIndex = 0;
-    for (int i = 0; i < width * height * 2; i += 4)
-    {
-        unsigned char y1 = yuy2Data[i];
-        unsigned char u = yuy2Data[i + 1];
-        unsigned char y2 = yuy2Data[i + 2];
-        unsigned char v = yuy2Data[i + 3];
-
-        rgbaData[rgbaIndex++] = clamp(y1 + 1.402 * (v - 128), 0.0, 255.0);
-        rgbaData[rgbaIndex++] = clamp(y1 - 0.344136 * (u - 128) - 0.714136 * (v - 128), 0.0, 255.0);
-        rgbaData[rgbaIndex++] = clamp(y1 + 1.772 * (u - 128), 0.0, 255.0);
-        rgbaData[rgbaIndex++] = 255;
-
-        rgbaData[rgbaIndex++] = clamp(y2 + 1.402 * (v - 128), 0.0, 255.0);
-        rgbaData[rgbaIndex++] = clamp(y2 - 0.344136 * (u - 128) - 0.714136 * (v - 128), 0.0, 255.0);
-        rgbaData[rgbaIndex++] = clamp(y2 + 1.772 * (u - 128), 0.0, 255.0);
-        rgbaData[rgbaIndex++] = 255;
-    }
-}
 
 bool Camera::Open(int cameraIndex)
 {
@@ -79,23 +37,12 @@ bool Camera::Open(int cameraIndex)
 
     std::cout << "Driver: " << cap.driver << "\nCard: " << cap.card << std::endl;
 
-    struct v4l2_format fmt;
-    memset(&fmt, 0, sizeof(fmt));
-    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    fmt.fmt.pix.width = frameWidth;
-    fmt.fmt.pix.height = frameHeight;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-
-    if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0)
+    if (!NegotiateFormat(frameWidth, frameHeight))
     {
-        perror("Error setting resolution");
+        close(fd);
+        fd = -1;
         return false;
     }
-
-    // The driver may negotiate a different resolution than requested; keep
-    // the members in sync with what was actually granted.
-    frameWidth = fmt.fmt.pix.width;
-    frameHeight = fmt.fmt.pix.height;
 
     if (!InitDevice() || !StartCapture())
     {
@@ -176,11 +123,19 @@ void Camera::CaptureLoop()
             break;
         }
 
-        ConvertYUY2ToRGBA(reinterpret_cast<unsigned char *>(buffers[buf.index].start), rgba.data(), frameWidth, frameHeight);
+        const bool converted = lite_camera::ConvertFrame(
+            pixelFormat, reinterpret_cast<unsigned char *>(buffers[buf.index].start),
+            FrameBytesUsed(buf, buffers[buf.index]), frameWidth, frameHeight,
+            bytesPerLine, rgba.data(), 4);
 
         if (ioctl(fd, VIDIOC_QBUF, &buf) < 0)
         {
             perror("Capture loop: failed to queue buffer");
+        }
+        if (!converted)
+        {
+            // A short or corrupt frame: skip it rather than read past it.
+            continue;
         }
 
         {
@@ -232,34 +187,17 @@ bool Camera::SetResolution(int width, int height)
     req.memory = V4L2_MEMORY_MMAP;
     ioctl(fd, VIDIOC_REQBUFS, &req);
 
-    struct v4l2_format fmt;
-    memset(&fmt, 0, sizeof(fmt));
-    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    fmt.fmt.pix.width = width;
-    fmt.fmt.pix.height = height;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-
-    bool success = false;
-    if (ioctl(fd, VIDIOC_S_FMT, &fmt) == 0)
-    {
-        // Save the actual resolution set by the device
-        frameWidth = fmt.fmt.pix.width;
-        frameHeight = fmt.fmt.pix.height;
-        success = InitDevice() && StartCapture();
-    }
+    bool success = NegotiateFormat(width, height) && InitDevice() && StartCapture();
 
     if (!success)
     {
         // Roll back to the previous format so the camera keeps working.
-        memset(&fmt, 0, sizeof(fmt));
-        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        fmt.fmt.pix.width = oldWidth;
-        fmt.fmt.pix.height = oldHeight;
-        fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-        if (ioctl(fd, VIDIOC_S_FMT, &fmt) == 0)
+        StopCapture();
+        UninitDevice();
+        req.count = 0;
+        ioctl(fd, VIDIOC_REQBUFS, &req);
+        if (NegotiateFormat(oldWidth, oldHeight))
         {
-            frameWidth = fmt.fmt.pix.width;
-            frameHeight = fmt.fmt.pix.height;
             if (InitDevice() && StartCapture() && wasStreaming)
             {
                 StartCaptureLoop(savedCallback);
@@ -335,16 +273,55 @@ FrameData Camera::CaptureFrame()
     frame.size = frameWidth * frameHeight * 3; // 3 bytes per pixel (RGB)
     frame.rgbData = new unsigned char[frame.size];
 
-    // Convert YUYV to RGB
-    ConvertYUY2ToRGB(reinterpret_cast<unsigned char *>(buffers[buf.index].start), frame.rgbData, frameWidth, frameHeight);
+    const bool converted = lite_camera::ConvertFrame(
+        pixelFormat, reinterpret_cast<unsigned char *>(buffers[buf.index].start),
+        FrameBytesUsed(buf, buffers[buf.index]), frameWidth, frameHeight,
+        bytesPerLine, frame.rgbData, 3);
 
     // Requeue the buffer
     if (ioctl(fd, VIDIOC_QBUF, &buf) < 0)
     {
         perror("Failed to queue buffer");
     }
+    if (!converted)
+    {
+        ReleaseFrame(frame);
+        return {};
+    }
 
     return frame;
+}
+
+// Asks for each supported format in order, and keeps the first one the
+// driver grants. VIDIOC_S_FMT can answer with another format (MJPG on
+// Parallels' and some laptop cameras); treating that as YUYV read past the
+// end of the frame buffer.
+bool Camera::NegotiateFormat(uint32_t width, uint32_t height)
+{
+    uint32_t offered = 0;
+    for (uint32_t fourcc : lite_camera::kSupportedFormats)
+    {
+        struct v4l2_format fmt;
+        memset(&fmt, 0, sizeof(fmt));
+        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        fmt.fmt.pix.width = width;
+        fmt.fmt.pix.height = height;
+        fmt.fmt.pix.pixelformat = fourcc;
+        fmt.fmt.pix.field = V4L2_FIELD_NONE;
+        if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0)
+            continue;
+        offered = fmt.fmt.pix.pixelformat;
+        if (offered != fourcc)
+            continue;
+        pixelFormat = fourcc;
+        frameWidth = fmt.fmt.pix.width;
+        frameHeight = fmt.fmt.pix.height;
+        bytesPerLine = fmt.fmt.pix.bytesperline;
+        return true;
+    }
+    std::cerr << "Camera offers no supported pixel format (YUYV, NV12); driver answered "
+              << std::string(reinterpret_cast<const char *>(&offered), 4) << std::endl;
+    return false;
 }
 
 bool Camera::InitDevice()

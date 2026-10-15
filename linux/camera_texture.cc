@@ -24,6 +24,10 @@ static gboolean camera_texture_copy_pixels(FlPixelBufferTexture *texture,
     std::lock_guard<std::mutex> lock(fb->mutex);
     if (!fb->has_frame)
     {
+        // No frame yet (the camera has not delivered one). The engine reads
+        // error->message when this returns FALSE, so the error must be set.
+        g_set_error_literal(error, g_quark_from_static_string("flutter_lite_camera"),
+                            0, "No camera frame yet");
         return FALSE;
     }
 
