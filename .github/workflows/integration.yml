@@ -105,6 +105,14 @@ jobs:
       - name: Build the fake V4L2 device shim
         if: env.FAKE_CAMERA == 'true'
         run: gcc -shared -fPIC -O2 -o "$RUNNER_TEMP/fake_v4l2.so" ci/fake_v4l2.c -ldl
+      # flutter_barcode_sdk_linux ships its Dynamsoft libraries for x86-64
+      # only, so the example app does not link on ARM64 ("skipping
+      # incompatible libDynamsoftCore.so"). Only the example's UI
+      # (lib/main.dart) uses it; the integration test does not import it.
+      - name: Remove the x86-64-only barcode SDK on ARM64
+        if: runner.arch == 'ARM64'
+        working-directory: example
+        run: flutter pub remove flutter_barcode_sdk
       - working-directory: example
         run: flutter pub get
       - name: Integration tests
