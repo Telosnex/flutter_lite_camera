@@ -105,6 +105,14 @@ jobs:
       - name: Build the fake V4L2 device shim
         if: env.FAKE_CAMERA == 'true'
         run: gcc -shared -fPIC -O2 -o "$RUNNER_TEMP/fake_v4l2.so" ci/fake_v4l2.c -ldl
+      # flutter_barcode_sdk_linux ships its Dynamsoft libraries for x86-64
+      # only, so the example app does not link on ARM64 ("skipping
+      # incompatible libDynamsoftCore.so"). Only the example's UI
+      # (lib/main.dart) uses it; the integration test does not import it.
+      - name: Remove the x86-64-only barcode SDK on ARM64
+        if: runner.arch == 'ARM64'
+        working-directory: example
+        run: flutter pub remove flutter_barcode_sdk
       - working-directory: example
         run: flutter pub get
       - name: Integration tests
@@ -119,10 +127,28 @@ jobs:
             fi
             xvfb-run -a "${run[@]}"
 
+  desktop-linux-arm64:
+    name: Linux ARM64 fake camera
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    env:
+      DEVICE: linux
+      FAKE_CAMERA: 'true'
+    steps: *linux_steps
+
   # No camera at all: the plugin must report no devices and refuse to open.
   desktop-linux-x64-no-camera:
     name: Linux x64 no camera
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      DEVICE: linux
+      FAKE_CAMERA: 'false'
+    steps: *linux_steps
+
+  desktop-linux-arm64-no-camera:
+    name: Linux ARM64 no camera
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     env:
       DEVICE: linux
@@ -134,6 +160,16 @@ jobs:
   desktop-linux-x64-no-camera-portal:
     name: Linux x64 no camera portal
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      DEVICE: linux
+      FAKE_CAMERA: 'false'
+      FLUTTER_LITE_CAMERA_PORTAL: '1'
+    steps: *linux_steps
+
+  desktop-linux-arm64-no-camera-portal:
+    name: Linux ARM64 no camera portal
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     env:
       DEVICE: linux
