@@ -19,9 +19,8 @@ class FlutterLiteCamera {
   /// can pass a different order if their HAL lays the chroma out
   /// differently.
   Future<Map<String, dynamic>> captureFrame({int byteOrder = 2}) {
-    return FlutterLiteCameraPlatform.instance.captureFrame(
-      byteOrder: byteOrder,
-    );
+    return FlutterLiteCameraPlatform.instance
+        .captureFrame(byteOrder: byteOrder);
   }
 
   /// Starts the native preview stream and returns a texture id that can be

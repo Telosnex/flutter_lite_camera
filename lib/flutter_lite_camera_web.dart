@@ -49,11 +49,8 @@ class FlutterLiteCameraWeb extends FlutterLiteCameraPlatform {
             .toDart;
     _videoDevices
       ..clear()
-      ..addAll(
-        devices.where(
-          (device) => device.kind == 'videoinput' && device.deviceId.isNotEmpty,
-        ),
-      );
+      ..addAll(devices.where((device) =>
+          device.kind == 'videoinput' && device.deviceId.isNotEmpty));
 
     final names = <String>[];
     for (var i = 0; i < _videoDevices.length; i++) {
@@ -66,8 +63,7 @@ class FlutterLiteCameraWeb extends FlutterLiteCameraPlatform {
   Future<void> _requestTemporaryStream() async {
     final stream = await dom.window.navigator.mediaDevices
         .getUserMedia(
-          dom.MediaStreamConstraints(video: true.toJS, audio: false.toJS),
-        )
+            dom.MediaStreamConstraints(video: true.toJS, audio: false.toJS))
         .toDart;
     for (final track in stream.getTracks().toDart) {
       track.stop();
@@ -150,9 +146,7 @@ class FlutterLiteCameraWeb extends FlutterLiteCameraPlatform {
     final element = _videoElement;
     if (element == null) {
       throw PlatformException(
-        code: 'CAMERA_ERROR',
-        message: 'Camera is not open.',
-      );
+          code: 'CAMERA_ERROR', message: 'Camera is not open.');
     }
 
     await _play();
@@ -198,9 +192,7 @@ class FlutterLiteCameraWeb extends FlutterLiteCameraPlatform {
     final element = _videoElement;
     if (element == null) {
       throw PlatformException(
-        code: 'CAPTURE_FAILED',
-        message: 'No frame available.',
-      );
+          code: 'CAPTURE_FAILED', message: 'No frame available.');
     }
 
     // Wait for frame metadata the first time so width/height are non-zero.
@@ -214,19 +206,15 @@ class FlutterLiteCameraWeb extends FlutterLiteCameraPlatform {
         if (!completer.isCompleted) completer.complete();
       }).toJS;
       element.addEventListener('loadedmetadata', metadataCallback);
-      await completer.future.timeout(
-        const Duration(seconds: 2),
-        onTimeout: () {},
-      );
+      await completer.future
+          .timeout(const Duration(seconds: 2), onTimeout: () {});
     }
 
     final width = element.videoWidth;
     final height = element.videoHeight;
     if (width == 0 || height == 0) {
       throw PlatformException(
-        code: 'CAPTURE_FAILED',
-        message: 'No frame available.',
-      );
+          code: 'CAPTURE_FAILED', message: 'No frame available.');
     }
 
     final canvas = dom.HTMLCanvasElement()
@@ -269,8 +257,7 @@ class FlutterLiteCameraWeb extends FlutterLiteCameraPlatform {
       // the same negotiation the native platforms do.
       await tracks.first
           .applyConstraints(
-            dom.MediaTrackConstraints(width: width.toJS, height: height.toJS),
-          )
+              dom.MediaTrackConstraints(width: width.toJS, height: height.toJS))
           .toDart;
       return true;
     } catch (e) {

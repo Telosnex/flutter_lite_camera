@@ -11,34 +11,37 @@ void main() {
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-          switch (methodCall.method) {
-            case 'getDeviceList':
-              return ['camera0'];
-            case 'open':
-              return true;
-            case 'startPreview':
-              return 7;
-            case 'stopPreview':
-            case 'release':
-              return null;
-            case 'getRotation':
-              return 90;
-            case 'setResolution':
-              return true;
-            case 'getWidth':
-              return 1280;
-            case 'getHeight':
-              return 720;
-            case 'captureFrame':
-              return <String, dynamic>{
-                'width': 640,
-                'height': 480,
-                'data': Uint8List(640 * 480 * 3),
-              };
-          }
-          return null;
-        });
+        .setMockMethodCallHandler(
+      channel,
+      (MethodCall methodCall) async {
+        switch (methodCall.method) {
+          case 'getDeviceList':
+            return ['camera0'];
+          case 'open':
+            return true;
+          case 'startPreview':
+            return 7;
+          case 'stopPreview':
+          case 'release':
+            return null;
+          case 'getRotation':
+            return 90;
+          case 'setResolution':
+            return true;
+          case 'getWidth':
+            return 1280;
+          case 'getHeight':
+            return 720;
+          case 'captureFrame':
+            return <String, dynamic>{
+              'width': 640,
+              'height': 480,
+              'data': Uint8List(640 * 480 * 3),
+            };
+        }
+        return null;
+      },
+    );
   });
 
   tearDown(() {
