@@ -16,7 +16,8 @@ class MockFlutterLiteCameraPlatform
   Future<bool> open(int index) => Future.value(true);
 
   @override
-  Future<Map<String, dynamic>> captureFrame({int byteOrder = 2}) => Future.value({
+  Future<Map<String, dynamic>> captureFrame({int byteOrder = 2}) =>
+      Future.value({
         'width': 640,
         'height': 480,
         'data': Uint8List(640 * 480 * 3),
@@ -38,7 +39,8 @@ class MockFlutterLiteCameraPlatform
   Future<bool> setResolution(int width, int height) => Future.value(true);
 
   @override
-  Future<bool> setResolutionPreset(ResolutionPreset preset) => Future.value(true);
+  Future<bool> setResolutionPreset(ResolutionPreset preset) =>
+      Future.value(true);
 
   @override
   Future<int> getWidth() => Future.value(640);
@@ -60,7 +62,8 @@ void main() {
 
   test('getDeviceList', () async {
     FlutterLiteCamera flutterLiteCameraPlugin = FlutterLiteCamera();
-    MockFlutterLiteCameraPlatform fakePlatform = MockFlutterLiteCameraPlatform();
+    MockFlutterLiteCameraPlatform fakePlatform =
+        MockFlutterLiteCameraPlatform();
     FlutterLiteCameraPlatform.instance = fakePlatform;
 
     expect(await flutterLiteCameraPlugin.getDeviceList(), ['camera0']);

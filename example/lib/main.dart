@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -15,9 +16,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: const CameraApp(),
-    );
+    return MaterialApp(home: const CameraApp());
   }
 }
 
@@ -68,8 +67,10 @@ class _CameraAppState extends State<CameraApp> {
     try {
       List<String> devices = await _flutterLiteCameraPlugin.getDeviceList();
       if (devices.isEmpty) {
-        debugPrint('No camera devices found. On an emulator, enable a '
-            'webcam/virtual scene in the AVD settings.');
+        debugPrint(
+          'No camera devices found. On an emulator, enable a '
+          'webcam/virtual scene in the AVD settings.',
+        );
         return;
       }
       debugPrint("Available Devices: $devices");
@@ -145,8 +146,8 @@ class _CameraAppState extends State<CameraApp> {
     if (!isDecoding && _barcodeReader != null) {
       isDecoding = true;
       try {
-        Map<String, dynamic> frame =
-            await _flutterLiteCameraPlugin.captureFrame();
+        Map<String, dynamic> frame = await _flutterLiteCameraPlugin
+            .captureFrame();
         if (frame.containsKey('data')) {
           _width = frame['width'];
           _height = frame['height'];
@@ -249,8 +250,9 @@ class _CameraAppState extends State<CameraApp> {
                         // buffer processing.
                         RotatedBox(
                           quarterTurns: (_rotation ~/ 90) % 4,
-                          child: _flutterLiteCameraPlugin
-                              .buildPreview(_textureId),
+                          child: _flutterLiteCameraPlugin.buildPreview(
+                            _textureId,
+                          ),
                         ),
                         CustomPaint(
                           painter: ResultPainter(
@@ -270,9 +272,7 @@ class _CameraAppState extends State<CameraApp> {
               },
             )
           else
-            Center(
-              child: Text('Camera not initialized'),
-            ),
+            Center(child: Text('Camera not initialized')),
           Positioned(
             bottom: 20,
             left: 20,
@@ -307,13 +307,15 @@ class _CameraAppState extends State<CameraApp> {
                           }
                         },
                         items: ResolutionPreset.values
-                            .map((p) => DropdownMenuItem(
-                                  value: p,
-                                  child: Text(
-                                    '${p.name} (${p.width}x${p.height})',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ))
+                            .map(
+                              (p) => DropdownMenuItem(
+                                value: p,
+                                child: Text(
+                                  '${p.name} (${p.width}x${p.height})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
                             .toList(),
                       ),
                     ),
@@ -400,10 +402,7 @@ class ResultPainter extends CustomPainter {
       final textPainter = TextPainter(
         text: TextSpan(
           text: result.text,
-          style: const TextStyle(
-            color: Colors.red,
-            fontSize: 16,
-          ),
+          style: const TextStyle(color: Colors.red, fontSize: 16),
         ),
         textDirection: TextDirection.ltr,
       );

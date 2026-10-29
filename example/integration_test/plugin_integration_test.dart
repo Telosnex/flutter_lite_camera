@@ -24,14 +24,17 @@ void main() {
     expect(devices, isA<List<String>>());
   });
 
-  testWidgets('camera open/preview/capture pipeline test',
-      (WidgetTester tester) async {
+  testWidgets('camera open/preview/capture pipeline test', (
+    WidgetTester tester,
+  ) async {
     final FlutterLiteCamera plugin = FlutterLiteCamera();
     final List<String> devices = await plugin.getDeviceList();
 
     if (devices.isEmpty) {
       // No camera on this host (e.g. a CI runner without a virtual camera).
-      // The full pipeline cannot be exercised here.
+      // The full pipeline cannot be exercised here, but opening a camera
+      // that is not there must fail cleanly, not crash or hang.
+      expect(await plugin.open(0), isFalse);
       return;
     }
 
@@ -58,8 +61,10 @@ void main() {
     // A second frame proves the stream is still running after captureFrame().
     await Future.delayed(const Duration(milliseconds: 200));
     final Map<String, dynamic> frame2 = await plugin.captureFrame();
-    expect((frame2['data'] as Uint8List).length,
-        (frame2['width'] as int) * (frame2['height'] as int) * 3);
+    expect(
+      (frame2['data'] as Uint8List).length,
+      (frame2['width'] as int) * (frame2['height'] as int) * 3,
+    );
 
     // Switching resolution mid-preview must keep frame data self-consistent
     // (regression test for a buffer-size race that crashed Windows/Linux).
@@ -68,8 +73,10 @@ void main() {
     await plugin.setResolutionPreset(ResolutionPreset.high);
     await Future.delayed(const Duration(milliseconds: 500));
     final Map<String, dynamic> frame3 = await plugin.captureFrame();
-    expect((frame3['data'] as Uint8List).length,
-        (frame3['width'] as int) * (frame3['height'] as int) * 3);
+    expect(
+      (frame3['data'] as Uint8List).length,
+      (frame3['width'] as int) * (frame3['height'] as int) * 3,
+    );
     expect(await plugin.getWidth(), frame3['width']);
     expect(await plugin.getHeight(), frame3['height']);
 

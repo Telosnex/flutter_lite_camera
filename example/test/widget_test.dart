@@ -7,8 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_lite_camera_example/main.dart';
 
 void main() {
-  testWidgets('App builds and shows camera controls',
-      (WidgetTester tester) async {
+  testWidgets('App builds and shows camera controls', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
