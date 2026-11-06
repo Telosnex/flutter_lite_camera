@@ -12,9 +12,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'package:flutter_lite_camera/flutter_lite_camera.dart';
+import 'package:telosnex_web_test/telosnex_web_test.dart';
+
+/// Set by CI jobs with a fake camera: the pipeline must run, so finding no
+/// camera is a failure there.
+const bool expectCamera =
+    bool.fromEnvironment('FLUTTER_LITE_CAMERA_EXPECT_CAMERA');
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  // On web: every test's result and the page console (telosnex_web_test).
+  installWebTestSupport(binding);
 
   testWidgets('getDeviceList test', (WidgetTester tester) async {
     final FlutterLiteCamera plugin = FlutterLiteCamera();
@@ -30,6 +38,7 @@ void main() {
     final FlutterLiteCamera plugin = FlutterLiteCamera();
     final List<String> devices = await plugin.getDeviceList();
 
+    expect(devices, expectCamera ? isNotEmpty : anything);
     if (devices.isEmpty) {
       // No camera on this host (e.g. a CI runner without a virtual camera).
       // The full pipeline cannot be exercised here, but opening a camera

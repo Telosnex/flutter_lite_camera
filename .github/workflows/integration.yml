@@ -176,3 +176,51 @@ jobs:
       FAKE_CAMERA: 'false'
       FLUTTER_LITE_CAMERA_PORTAL: '1'
     steps: *linux_steps
+
+  # Chrome's fake camera (--use-fake-device-for-media-stream, a test pattern)
+  # with the permission prompt answered (--use-fake-ui-for-media-stream):
+  # getUserMedia, the video element and captureFrame's canvas read, through
+  # flutter drive. flutter drive has no option for browser flags, so they go
+  # in a wrapper given as --chrome-binary. EXPECT_CAMERA makes a missing
+  # camera a failure. The jobs share the steps of the first (YAML anchor).
+  web-linux-chrome-dart2js:
+    name: Web Linux x64 Chrome fake camera dart2js
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPILER: dart2js
+    steps: &web_steps
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@4a798518378fb0c362ebe42940227560e6b4ecde # v0.5.8
+      - working-directory: example
+        run: flutter pub get
+      - name: Chrome with the fake camera
+        run: |
+          chrome=$(command -v google-chrome)
+          printf '#!/bin/bash\nexec "%s" --use-fake-device-for-media-stream --use-fake-ui-for-media-stream "$@"\n' \
+            "$chrome" > "$RUNNER_TEMP/chrome_fake_camera"
+          chmod +x "$RUNNER_TEMP/chrome_fake_camera"
+      - uses: Telosnex/telosnex_ci_tools/actions/web-driver@4a798518378fb0c362ebe42940227560e6b4ecde # v0.5.8
+        with:
+          browser: chrome
+          working-directory: example
+          artifact-name: web-chrome-${{ env.COMPILER }}-logs
+          # Never pass without results: both tests ran.
+          require-result: '.telosnexWebTestSummary.passed >= 2'
+          run: |
+            args=(--dart-define=FLUTTER_LITE_CAMERA_EXPECT_CAMERA=true)
+            if [[ "$COMPILER" == dart2wasm ]]; then args+=(--wasm); fi
+            flutter drive --release -d web-server --browser-name chrome \
+              --chrome-binary "$RUNNER_TEMP/chrome_fake_camera" \
+              --driver test_driver/integration_test.dart \
+              --target integration_test/plugin_integration_test.dart "${args[@]}"
+
+  web-linux-chrome-dart2wasm:
+    name: Web Linux x64 Chrome fake camera dart2wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPILER: dart2wasm
+    steps: *web_steps
