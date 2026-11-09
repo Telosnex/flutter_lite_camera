@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@6297b4dbe04372d8f73b1ab775afd16f938c6e23 # v0.5.11
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c356a8d59e643d5fc8c552950fdd45c7e3bfea7f # v0.5.12
       - working-directory: example
         run: flutter pub get
       # flutter_barcode_sdk_macos ships dylibs with broken install names (e.g.
@@ -69,7 +69,7 @@ jobs:
       # Launching a desktop app on the macOS runner occasionally fails with
       # "Unable to start the app on the device"; retry a few times.
       - name: Integration tests
-        uses: Telosnex/telosnex_ci_tools/actions/watch@6297b4dbe04372d8f73b1ab775afd16f938c6e23 # v0.5.11
+        uses: Telosnex/telosnex_ci_tools/actions/watch@c356a8d59e643d5fc8c552950fdd45c7e3bfea7f # v0.5.12
         with:
           working-directory: example
           idle-minutes: '15'
@@ -108,7 +108,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@6297b4dbe04372d8f73b1ab775afd16f938c6e23 # v0.5.11
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c356a8d59e643d5fc8c552950fdd45c7e3bfea7f # v0.5.12
       # libpipewire-0.3-dev makes CMake build the camera portal (Flatpak)
       # backend, which is the fork's change; without it only V4L2 is built.
       - name: Install dependencies
@@ -130,7 +130,7 @@ jobs:
       - working-directory: example
         run: flutter pub get
       - name: Integration tests
-        uses: Telosnex/telosnex_ci_tools/actions/watch@6297b4dbe04372d8f73b1ab775afd16f938c6e23 # v0.5.11
+        uses: Telosnex/telosnex_ci_tools/actions/watch@c356a8d59e643d5fc8c552950fdd45c7e3bfea7f # v0.5.12
         with:
           working-directory: example
           idle-minutes: '15'
@@ -207,7 +207,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@6297b4dbe04372d8f73b1ab775afd16f938c6e23 # v0.5.11
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@c356a8d59e643d5fc8c552950fdd45c7e3bfea7f # v0.5.12
       - working-directory: example
         run: flutter pub get
       - name: Chrome with the fake camera
@@ -216,7 +216,7 @@ jobs:
           printf '#!/bin/bash\nexec "%s" --use-fake-device-for-media-stream --use-fake-ui-for-media-stream "$@"\n' \
             "$chrome" > "$RUNNER_TEMP/chrome_fake_camera"
           chmod +x "$RUNNER_TEMP/chrome_fake_camera"
-      - uses: Telosnex/telosnex_ci_tools/actions/web-driver@6297b4dbe04372d8f73b1ab775afd16f938c6e23 # v0.5.11
+      - uses: Telosnex/telosnex_ci_tools/actions/web-driver@c356a8d59e643d5fc8c552950fdd45c7e3bfea7f # v0.5.12
         with:
           browser: chrome
           working-directory: example
