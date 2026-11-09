@@ -60,6 +60,12 @@ jobs:
             install_name_tool -id "@rpath/$(basename "$f")" "$f" || true
             codesign --force --sign - "$f" || true
           done
+      # flutter_barcode_sdk (used only by the example's main.dart) ships
+      # Windows x64 libraries only, so it cannot link for ARM64. The
+      # integration tests do not import it.
+      - if: runner.os == 'Windows' && runner.arch == 'ARM64'
+        working-directory: example
+        run: flutter pub remove flutter_barcode_sdk
       # Launching a desktop app on the macOS runner occasionally fails with
       # "Unable to start the app on the device"; retry a few times.
       - name: Integration tests
