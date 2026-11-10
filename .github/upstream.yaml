@@ -1,0 +1,10 @@
+# Upstream sources, checked daily by the Upstream watch workflow
+# (telosnex_ci_tools, lib/src/upstream.dart). Set `seen` to skip an update.
+sources:
+  # The repository this one is a fork of. The pin is the last upstream commit
+  # merged here: update it with each merge. Alert once the oldest unmerged
+  # commit is a week old.
+  - name: yushulx/flutter_lite_camera
+    branch: https://github.com/yushulx/flutter_lite_camera
+    pin: b683e00e13fd20bded54426c64b979dcdd253a24
+    lag_days: 7
