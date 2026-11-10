@@ -6,5 +6,5 @@ sources:
   # commit is a week old.
   - name: yushulx/flutter_lite_camera
     branch: https://github.com/yushulx/flutter_lite_camera
-    pin: b683e00e13fd20bded54426c64b979dcdd253a24
+    pin: 92ec7fff7b7d10a6ea8d0e7ded49e86afa4d09be
     lag_days: 7
