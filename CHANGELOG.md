@@ -1,3 +1,13 @@
+# 0.2.4
+
+- Docs: the README links to the hosted web demo of the example app
+  (https://www.dynamsoft.com/codepool/demos/flutter-camera-barcode-scanner/).
+- Example: the preview shows a status pill while the barcode wasm module loads
+  and the first frame is decoded, and a decode call now times out after 30 s
+  instead of leaving the scanning loop blocked.
+- Example: engine start-up is retried once and shows a visible message when it
+  still fails, instead of failing silently.
+
 # 0.2.3
 
 - Android: `captureFrame()` honors the `byteOrder` argument again — 0.2.2

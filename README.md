@@ -4,6 +4,10 @@
 
 ![Flutter camera preview app](https://www.dynamsoft.com/codepool/img/2025/01/flutter-lite-camera.png)
 
+## Live demo
+
+[Flutter Camera Barcode Scanner](https://www.dynamsoft.com/codepool/demos/flutter-camera-barcode-scanner/) runs the `example` app as a Flutter web build — no install, just camera permission. Open the camera, switch resolution, and read 1D/2D barcodes with Dynamsoft Barcode Reader.
+
 ## Features
 - **Cross-Platform**: Compatible with **Windows**, **Linux**, **macOS**, **iOS**, **Android**, and **web**.
 - **Zero-Copy Preview**: Renders the video feed directly at the native layer — a `FlutterTexture` fed by BGRA buffers on iOS/macOS, an engine `SurfaceTexture` on Android, and an embedded `getUserMedia` video element on the web. No per-frame data copies into Dart.
