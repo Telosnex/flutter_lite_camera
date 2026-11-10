@@ -21,8 +21,7 @@ extension type _DemoAnalytics._(JSObject _) implements JSObject {
 _DemoAnalytics? _fromScope(JSObject? scope) {
   if (scope == null) return null;
   try {
-    final JSObject? api =
-        scope.getProperty<JSObject?>('DemoAnalytics'.toJS);
+    final JSObject? api = scope.getProperty<JSObject?>('DemoAnalytics'.toJS);
     return api == null ? null : _DemoAnalytics._(api);
   } catch (_) {
     return null;

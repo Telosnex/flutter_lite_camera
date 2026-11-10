@@ -92,7 +92,8 @@ class _CameraAppState extends State<CameraApp> {
         }
         return;
       } catch (e) {
-        reportDemoAction('barcode_init_failed', {'attempt': attempt, 'error': '$e'});
+        reportDemoAction(
+            'barcode_init_failed', {'attempt': attempt, 'error': '$e'});
         debugPrint('Barcode SDK init failed (attempt $attempt): $e');
         _barcodeReader = null;
         await Future<void>.delayed(const Duration(seconds: 2));
@@ -123,7 +124,7 @@ class _CameraAppState extends State<CameraApp> {
       // The native layer renders the video feed into this texture; no
       // frame data crosses into Dart for display purposes.
       setState(() => _status = 'Loading barcode engine…');
-    int textureId = await _flutterLiteCameraPlugin.startPreview();
+      int textureId = await _flutterLiteCameraPlugin.startPreview();
       int rotation = 0;
       try {
         rotation = await _flutterLiteCameraPlugin.getRotation();
@@ -332,8 +333,7 @@ class _CameraAppState extends State<CameraApp> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color:
-                                        Colors.black.withValues(alpha: 0.55),
+                                    color: Colors.black.withValues(alpha: 0.55),
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                   child: Text(
