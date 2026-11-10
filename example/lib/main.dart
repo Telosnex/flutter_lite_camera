@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_barcode_sdk/flutter_barcode_sdk.dart';
 import 'package:flutter_lite_camera/flutter_lite_camera.dart';
 
+import 'demo_bridge.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -43,25 +45,63 @@ class _CameraAppState extends State<CameraApp> {
   ResolutionPreset _preset = ResolutionPreset.medium;
   bool _shouldDecode = false;
   FlutterBarcodeSdk? _barcodeReader;
-  // To read barcodes, get a 30-day FREEE trial license for Dynamsoft Barcode Reader https://www.dynamsoft.com/customer/license/trialLicense/?product=dcv&package=cross-platform
-  String licenseKey =
-      'DLS2eyJoYW5kc2hha2VDb2RlIjoiMjAwMDAxLTE2NDk4Mjk3OTI2MzUiLCJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSIsInNlc3Npb25QYXNzd29yZCI6IndTcGR6Vm05WDJrcEQ5YUoifQ==';
+  // Resolved at runtime: the hosted demo injects the Codepool license on
+  // dynamsoft.com and the public trial key everywhere else (see
+  // demo_bridge.dart). For anything beyond local experiments, get your own
+  // 30-day free trial license:
+  // https://www.dynamsoft.com/customer/license/trialLicense/?product=dcv&package=cross-platform
+  final String _licenseKey = resolveDemoLicenseKey();
   bool isDecoding = false;
+  bool _reportedFirstScan = false;
   List<BarcodeResult>? results;
+  // Shown over the preview until the first result arrives: the browser build
+  // has to download and initialise the barcode wasm module, and the first
+  // decode can take several seconds on a slow machine.
+  String _status = 'Starting camera…';
 
   @override
   void initState() {
     super.initState();
     _handleWindowClose();
-    if (licenseKey != '') {
+    if (_licenseKey.isNotEmpty) {
       initBarcodeSDK();
+    }
+    // The hosted demo appends ?autostart=1 to the iframe URL so the camera
+    // opens on load; a standalone run keeps the manual Start button.
+    if (Uri.base.queryParameters['autostart'] == '1') {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startCamera());
     }
   }
 
   Future<void> initBarcodeSDK() async {
-    _barcodeReader = FlutterBarcodeSdk();
-    await _barcodeReader!.setLicense(licenseKey);
-    await _barcodeReader!.init();
+    final Stopwatch stopwatch = Stopwatch()..start();
+    // License activation can fail when the page runs from a stale cache or the
+    // SDK bundle never loaded (DBR then reports -30063 on the first capture).
+    // Retry once so a transient failure does not leave the demo silent.
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        _barcodeReader = FlutterBarcodeSdk();
+        final int licensed = await _barcodeReader!.setLicense(_licenseKey);
+        if (licensed != 0) {
+          throw StateError('setLicense returned $licensed');
+        }
+        await _barcodeReader!.init();
+        reportDemoReady(stopwatch.elapsedMilliseconds);
+        if (mounted && _isCameraOpened) {
+          setState(() => _status = 'Scanning for barcodes…');
+        }
+        return;
+      } catch (e) {
+        reportDemoAction('barcode_init_failed', {'attempt': attempt, 'error': '$e'});
+        debugPrint('Barcode SDK init failed (attempt $attempt): $e');
+        _barcodeReader = null;
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+    }
+    if (mounted) {
+      setState(() => _status =
+          'Barcode engine unavailable — hard-reload the page (Ctrl+F5).');
+    }
   }
 
   Future<void> _startCamera() async {
@@ -82,7 +122,8 @@ class _CameraAppState extends State<CameraApp> {
       }
       // The native layer renders the video feed into this texture; no
       // frame data crosses into Dart for display purposes.
-      int textureId = await _flutterLiteCameraPlugin.startPreview();
+      setState(() => _status = 'Loading barcode engine…');
+    int textureId = await _flutterLiteCameraPlugin.startPreview();
       int rotation = 0;
       try {
         rotation = await _flutterLiteCameraPlugin.getRotation();
@@ -103,6 +144,7 @@ class _CameraAppState extends State<CameraApp> {
         }
         _rotation = rotation;
         _shouldDecode = true;
+        _status = 'Scanning for barcodes…';
       });
 
       // Start pulling frames for barcode decoding only. This does not
@@ -115,6 +157,7 @@ class _CameraAppState extends State<CameraApp> {
         await _applyResolution(_preset);
       }
     } catch (e) {
+      reportDemoAction('camera_error', {'message': '$e'});
       debugPrint("Error initializing camera: $e");
     }
   }
@@ -152,14 +195,24 @@ class _CameraAppState extends State<CameraApp> {
           _height = frame['height'];
           Uint8List rgbBuffer = frame['data'];
 
-          final ret = await _barcodeReader!.decodeImageBuffer(
-            rgbBuffer,
-            _width,
-            _height,
-            _width * 3,
-            ImagePixelFormat.IPF_RGB_888.index,
-            ImageRotation.rotation0.value,
-          );
+          // The first wasm decode can take tens of seconds on a slow
+          // machine. Without a timeout a stalled call would leave
+          // isDecoding true forever and stop the loop.
+          final ret = await _barcodeReader!
+              .decodeImageBuffer(
+                rgbBuffer,
+                _width,
+                _height,
+                _width * 3,
+                ImagePixelFormat.IPF_RGB_888.index,
+                ImageRotation.rotation0.value,
+              )
+              .timeout(const Duration(seconds: 30));
+
+          if (ret.isNotEmpty && !_reportedFirstScan) {
+            _reportedFirstScan = true;
+            reportDemoScan('camera');
+          }
 
           setState(() {
             results = ret;
@@ -185,7 +238,9 @@ class _CameraAppState extends State<CameraApp> {
       setState(() {
         _isCameraOpened = false;
         _textureId = -1;
+        _reportedFirstScan = false;
         results = null;
+        _status = 'Starting camera…';
       });
     }
   }
@@ -263,6 +318,33 @@ class _CameraAppState extends State<CameraApp> {
                           ),
                           child: Container(),
                         ),
+                        // Status pill: the wasm engine needs a few seconds to
+                        // load, so say so instead of showing an empty overlay.
+                        if (_isCameraOpened &&
+                            (results == null || results!.isEmpty))
+                          Positioned(
+                            left: 12,
+                            right: 12,
+                            top: 12,
+                            child: IgnorePointer(
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.black.withValues(alpha: 0.55),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Text(
+                                    _status,
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 13),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
