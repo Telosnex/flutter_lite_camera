@@ -1,3 +1,5 @@
+// Keep the Flutter SDK export for compatibility with older SDKs.
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'dart:async';
 
