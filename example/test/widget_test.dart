@@ -1,5 +1,7 @@
 // Smoke test for the example app.
 
+// Keep the Flutter SDK export for compatibility with older SDKs.
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter_lite_camera/flutter_lite_camera.dart';
 import 'package:flutter_test/flutter_test.dart';
